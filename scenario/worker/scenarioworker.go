@@ -22,4 +22,10 @@ func (w *ScenarioWorker) handleUpdate(new *simulationv1alpha1.Scenario) error {
 	w.scenario = new
 }
 
-func (w *ScenarioWorker) handleDelete()
+func (w *ScenarioWorker) Stop() {
+	w.stopCh <- struct{}{}
+}
+
+func (w *ScenarioWorker) handleDelete() {
+	w.Stop()
+}
