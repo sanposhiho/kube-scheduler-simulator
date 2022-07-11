@@ -276,7 +276,12 @@ type PodResult struct {
 	PreemptedAt *ScenarioStep `json:"preemptedAt"`
 	// ScheduleResult has the results of all scheduling for the Pod.
 	//
+	// If the scheduler working with a simulator isn't worked on scheduling framework,
+	// this field will be empty.
+	// TODO: add the link to doc when it's empty.
+	//
 	// +patchStrategy=replace
+	// +optional
 	ScheduleResult []ScenarioPodScheduleResult `json:"scheduleResult"`
 }
 
