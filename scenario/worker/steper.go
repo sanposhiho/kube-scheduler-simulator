@@ -2,6 +2,7 @@ package worker
 
 import simulationv1alpha1 "sigs.k8s.io/kube-scheduler-simulator/scenario/api/v1alpha1"
 
+// stepper will run all the events defined in the single step.
 type stepper struct {
 	step   simulationv1alpha1.ScenarioStep
 	events []*simulationv1alpha1.ScenarioEvent
@@ -28,8 +29,8 @@ func buildSteppersMap(scenario *simulationv1alpha1.Scenario) map[simulationv1alp
 }
 
 func (s *stepper) run() error {
-	//	for _, event := range s.events {
-	//		event = event
-	//	}
+	for _, event := range s.events {
+		event.Operation
+	}
 	return nil
 }
