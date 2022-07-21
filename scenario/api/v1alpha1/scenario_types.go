@@ -27,46 +27,45 @@ import (
 
 // ScenarioSpec defines the desired state of Scenario
 type ScenarioSpec struct {
-	// Events field has all operations for a scenario.
-	// Also you can add new events during the scenario is running.
+	// Operations field has all operations for a scenario.
+	// Also you can add a new operation during the scenario is running.
 	//
 	// +patchMergeKey=ID
 	// +patchStrategy=merge
-	Events []*ScenarioEvent `json:"events"`
+	Operations []*ScenarioOperation `json:"operations"`
 }
 
-type ScenarioEvent struct {
-	// ID for this event. Normally, the system sets this field for you.
+type ScenarioOperation struct {
+	// ID for this operation. Normally, the system sets this field for you.
 	ID string `json:"id"`
-	// Step indicates the step at which the event occurs.
+	// Step indicates the step at which the operation should be done.
 	Step ScenarioStep `json:"step"`
-	// Operation describes which operation this event wants to do.
-	// Only "Create", "Patch", "Delete", "Done" are valid operations in ScenarioEvent.
-	Operation OperationType `json:"operation"`
 
 	// One of the following four fields must be specified.
-	// If more than one is specified or if all are empty, the event is invalid and the scenario will fail.
+	// If more than one is specified or if all are empty, the operation is invalid and the scenario will fail.
 
-	// CreateOperation is the operation to create new resource.
+	// Create is the operation to create new resource.
 	// When use CreateOperation, Operation should be "Create".
 	//
 	// +optional
-	CreateOperation *CreateOperation `json:"createOperation,omitempty"`
-	// PatchOperation is the operation to patch a resource.
+	Create *CreateOperation `json:"createOperation,omitempty"`
+	// Patch is the operation to patch a resource.
 	// When use PatchOperation, Operation should be "Patch".
 	//
 	// +optional
-	PatchOperation *PatchOperation `json:"patchOperation,omitempty"`
-	// DeleteOperation indicates the operation to delete a resource.
+	Patch *PatchOperation `json:"patchOperation,omitempty"`
+	// Delete indicates the operation to delete a resource.
 	// When use DeleteOperation, Operation should be "Delete".
 	//
 	// +optional
-	DeleteOperation *DeleteOperation `json:"deleteOperation,omitempty"`
-	// DoneOperation indicates the operation to mark the scenario as DONE.
+	Delete *DeleteOperation `json:"deleteOperation,omitempty"`
+	// Done indicates the operation to mark the scenario as DONE.
 	// When use DoneOperation, Operation should be "Done".
+	// And the step which has DoneOperation shouldn't have the other types of operations,
+	// since DoneOperation will finish the Scenario immediately.
 	//
 	// +optional
-	DoneOperation *DoneOperation `json:"doneOperation,omitempty"`
+	Done *DoneOperation `json:"doneOperation,omitempty"`
 }
 
 // OperationType describes Operation.
@@ -84,8 +83,8 @@ const (
 )
 
 type CreateOperation struct {
-	// Object is the Object to be create.
-	Object unstructured.Unstructured `json:"object"`
+	// Object is the Object to be created.
+	Object *unstructured.Unstructured `json:"object"`
 
 	// +optional
 	CreateOptions metav1.CreateOptions `json:"createOptions,omitempty"`
@@ -98,7 +97,7 @@ type PatchOperation struct {
 	Patch string `json:"patch"`
 
 	// +optional
-	PatchOptions metav1.PatchOptions `json:"patchOptions,omitempty"`
+	PatchOptions *metav1.PatchOptions `json:"patchOptions,omitempty"`
 }
 
 type DeleteOperation struct {
@@ -106,12 +105,10 @@ type DeleteOperation struct {
 	ObjectMeta metav1.ObjectMeta `json:"objectMeta"`
 
 	// +optional
-	DeleteOptions metav1.DeleteOptions `json:"deleteOptions,omitempty"`
+	DeleteOptions *metav1.DeleteOptions `json:"deleteOptions,omitempty"`
 }
 
-type DoneOperation struct {
-	Done bool `json:"done"`
-}
+type DoneOperation struct{}
 
 // ScenarioStep is the step simply represented by numbers and used in the simulation.
 // In ScenarioStep, step is moved to next step when it can no longer schedule any more Pods in that step.
@@ -124,18 +121,13 @@ type ScenarioStatus struct {
 	//
 	// +optional
 	Phase ScenarioPhase `json:"phase,omitempty"`
-	// Current state of scheduler.
-	//
-	// +optional
-	SchedulerStatus SchedulerStatus `json:"schedulerStatus,omitempty"`
-	// A human readable message indicating details about why the scenario is in this phase.
+	// A human-readable message indicating details about why the scenario is in this phase.
 	//
 	// +optional
 	Message *string `json:"message,omitempty"`
-	// Step indicates the current step.
+	// StepStatus has the status related to step.
 	//
-	// +optional
-	Step ScenarioStep `json:"step,omitempty"`
+	StepStatus ScenarioStepStatus
 	// ScenarioResult has the result of the simulation.
 	// Just before Step advances, this result is updated based on all occurrences at that step.
 	//
@@ -143,23 +135,38 @@ type ScenarioStatus struct {
 	ScenarioResult ScenarioResult `json:"scenarioResult,omitempty"`
 }
 
-type SchedulerStatus string
+type ScenarioStepStatus struct {
+	// Step indicates the current step.
+	//
+	// +optional
+	Step ScenarioStep `json:"step,omitempty"`
+	// Phase indicates the current phase in single step.
+	//
+	// Within a single step, the phase proceeds as follows:
+	// 1. run all scenario.Spec.Operations defined for that step. (Operating)
+	// 2. finish (1) (OperatingFinished)
+	// 3. the scheduler starts scheduling. (Scheduling)
+	// 4. the scheduler stops scheduling and changes scenario.Status.StepStatus.Phase to SchedulingFinished
+	//    when it can no longer schedule any more Pods. (Scheduling -> SchedulingFinished)
+	// 5. update status.scenarioResult and move to next step. (StepFinished)
+	// +optional
+	Phase StepPhase `json:"phase,omitempty"`
+}
+
+type StepPhase string
 
 const (
-	// SchedulerWillRun indicates the scheduler is expected to start to schedule.
-	// In other words, the scheduler is currently stopped,
-	// and will start to schedule Pods when the state is SchedulerWillRun.
-	SchedulerWillRun SchedulerStatus = "WillRun"
-	// SchedulerRunning indicates the scheduler is scheduling Pods.
-	SchedulerRunning SchedulerStatus = "Running"
-	// SchedulerWillStop indicates the scheduler is expected to stop scheduling.
-	// In other words, the scheduler is currently scheduling Pods,
-	// and will stop scheduling when the state is SchedulerWillStop.
-	SchedulerWillStop SchedulerStatus = "WillStop"
-	// SchedulerStoped indicates the scheduler stops scheduling Pods.
-	SchedulerStoped SchedulerStatus = "Stoped"
-	// SchedulerUnknown indicates the scheduler's status is unknown.
-	SchedulerUnknown ScenarioPhase = "Unknown"
+	// Operating means controller is currently operating operation defined for the step.
+	Operating StepPhase = "Operating"
+	// OperatingFinished means controller have finished operating operation defined for the step.
+	OperatingFinished StepPhase = "OperatingFinished"
+	// Scheduling means scheduler is scheduling Pods.
+	Scheduling StepPhase = "Scheduling"
+	// SchedulingFinished means scheduler is trying to schedule Pods.
+	// But, it can no longer schedule any more Pods.
+	SchedulingFinished StepPhase = "SchedulingFinished"
+	// StepFinished means controller is preparing to move to next step.
+	StepFinished StepPhase = "Finished"
 )
 
 type ScenarioPhase string
@@ -170,12 +177,12 @@ const (
 	ScenarioPending ScenarioPhase = "Pending"
 	// ScenarioRunning phase indicates the scenario is running.
 	ScenarioRunning ScenarioPhase = "Running"
-	// ScenarioPaused phase indicates all ScenarioSpec.Events
-	// has been finished but has not been marked as done by ScenarioDone ScenarioEvent.
+	// ScenarioPaused phase indicates all ScenarioSpec.Operations
+	// has been finished but has not been marked as done by ScenarioDone ScenarioOperations.
 	ScenarioPaused ScenarioPhase = "Paused"
 	// ScenarioSucceeded phase describes Scenario is fully completed
-	// by ScenarioDone ScenarioEvent. User
-	// can’t add any ScenarioEvent once
+	// by ScenarioDone ScenarioOperations. User
+	// can’t add any ScenarioOperations once
 	// Scenario reached at the phase.
 	ScenarioSucceeded ScenarioPhase = "Succeeded"
 	// ScenarioFailed phase indicates something wrong happened during running scenario.
@@ -189,8 +196,8 @@ const (
 type ScenarioResult struct {
 	// SimulatorVersion represents the version of the simulator that runs this scenario.
 	SimulatorVersion string `json:"simulatorVersion"`
-	// Timeline is a map of events keyed with ScenarioStep.
-	// This may have many of the same events as .spec.events, but has additional PodScheduled and Delete events for Pods
+	// Timeline is a map of operations keyed with ScenarioStep.
+	// This may have many of the same operations as .spec.operations, but has additional PodScheduled and Delete operations for Pods
 	// to represent a Pod is scheduled or preempted by the scheduler.
 	//
 	// +patchMergeKey=ID
@@ -199,27 +206,24 @@ type ScenarioResult struct {
 }
 
 type ScenarioTimelineEvent struct {
-	// The ID will be the same as spec.ScenarioEvent.ID if it is from the defined event.
+	// The ID will be the same as spec.ScenarioOperations.ID if it is from the defined operation.
 	// Otherwise, it'll be newly generated.
 	ID string
-	// Step indicates the step at which the event occurs.
+	// Step indicates the step at which the operation has been done.
 	Step ScenarioStep `json:"step"`
-	// Operation describes which operation this event wants to do.
-	// Only "Create", "Patch", "Delete", "Done", "PodScheduled", "PodUnscheduled", "PodPreempted" are valid operations in ScenarioTimelineEvent.
-	Operation OperationType `json:"operation"`
 
 	// Only one of the following fields must be non-empty.
 
-	// Create is the result of ScenarioSpec.Events.CreateOperation.
+	// Create is the result of ScenarioSpec.Operations.CreateOperation.
 	// When Create is non nil, Operation should be "Create".
 	Create *CreateOperationResult `json:"create"`
-	// Patch is the result of ScenarioSpec.Events.PatchOperation.
+	// Patch is the result of ScenarioSpec.Operations.PatchOperation.
 	// When Patch is non nil, Operation should be "Patch".
 	Patch *PatchOperationResult `json:"patch"`
-	// Delete is the result of ScenarioSpec.Events.DeleteOperation.
+	// Delete is the result of ScenarioSpec.Operations.DeleteOperation.
 	// When Delete is non nil, Operation should be "Delete".
 	Delete *DeleteOperationResult `json:"delete"`
-	// Done is the result of ScenarioSpec.Events.DoneOperation.
+	// Done is the result of ScenarioSpec.Operations.DoneOperation.
 	// When Done is non nil, Operation should be "Done".
 	Done *DoneOperationResult `json:"done"`
 	// PodScheduled represents the Pod is scheduled to a Node.

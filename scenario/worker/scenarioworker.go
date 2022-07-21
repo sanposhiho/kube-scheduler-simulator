@@ -4,20 +4,27 @@ import simulationv1alpha1 "sigs.k8s.io/kube-scheduler-simulator/scenario/api/v1a
 
 type ScenarioWorker struct {
 	scenario *simulationv1alpha1.Scenario
+	// steps is the list sorted by ascending order of step.
+	steps []simulationv1alpha1.ScenarioStep
+	// steppers is the map keyed by step.
 	steppers map[simulationv1alpha1.ScenarioStep]*stepper
 	stopCh   chan<- struct{}
 }
 
 func New(scenario *simulationv1alpha1.Scenario) *ScenarioWorker {
+	steppers, steps := buildSteppersMap(scenario)
 	return &ScenarioWorker{
 		scenario: scenario,
-		steppers: buildSteppersMap(scenario),
+		steppers: steppers,
+		steps:    steps,
 		stopCh:   make(chan<- struct{}),
 	}
 }
 
-func Run(stopCh chan<- struct{}) {
-
+func (w *ScenarioWorker) Run(stopCh chan<- struct{}) {
+	for _, s := range w.steppers {
+		s.run()
+	}
 }
 
 func (w *ScenarioWorker) handleUpdate(new *simulationv1alpha1.Scenario) error {
