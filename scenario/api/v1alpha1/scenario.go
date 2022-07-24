@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"context"
 	"errors"
 
 	runtimeschema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -14,41 +15,48 @@ import (
 	"golang.org/x/xerrors"
 )
 
-//// Run runs the event.
-//// It returns the func to update ScenarioResult and error.
-//func (e *ScenarioOperation) Run(ctx context.Context, cfg *rest.Config) (StatusUpdateFn, error) {
-//	// TODO: validation webhook will reject when there are multiple non-nil operations in single Event.
-//	switch {
-//	case e.CreateOperation != nil:
-//		ope := e.CreateOperation
-//		gvk := ope.Object.GetObjectKind().GroupVersionKind()
-//		client, err := buildClient(gvk, cfg)
-//		_, err = client.Create(ctx, ope.Object, ope.CreateOptions)
-//		if err != nil {
-//			return nil, xerrors.Errorf("run create operation: id: %s error: %w", e.ID, err)
-//		}
-//	case e.PatchOperation != nil:
-//	case e.DeleteOperation != nil:
-//	case e.DoneOperation != nil:
-//		return e.DoneOperation.run(e.Step)
-//	}
-//
-//	return true, nil
-//}
+// Run runs the event.
+// It returns boolean shows whether the Scenario should finish in this step.
+func (e *ScenarioOperation) Run(ctx context.Context, cfg *rest.Config) (bool, error) {
+	// TODO: validation webhook will reject when there are multiple non-nil operations in single Event.
+	switch {
+	case e.Create != nil:
+		ope := e.Create
+		gvk := ope.Object.GetObjectKind().GroupVersionKind()
+		client, err := buildClient(gvk, cfg)
+		_, err = client.Create(ctx, ope.Object, ope.CreateOptions)
+		if err != nil {
+			return true, xerrors.Errorf("run create operation: id: %s error: %w", e.ID, err)
+		}
+	case e.Patch != nil:
+		ope := e.Patch
+		gvk := ope.TypeMeta.GroupVersionKind()
+		client, err := buildClient(gvk, cfg)
+		_, err = client.Patch(ctx, ope.ObjectMeta.Name, ope.PatchType, []byte(ope.Patch), ope.PatchOptions)
+		if err != nil {
+			return true, xerrors.Errorf("run create operation: id: %s error: %w", e.ID, err)
+		}
+	case e.Delete != nil:
+		ope := e.Delete
+		gvk := ope.TypeMeta.GroupVersionKind()
+		client, err := buildClient(gvk, cfg)
+		err = client.Delete(ctx, ope.ObjectMeta.Name, ope.DeleteOptions)
+		if err != nil {
+			return true, xerrors.Errorf("run create operation: id: %s error: %w", e.ID, err)
+		}
+	case e.Done != nil:
+		return true, nil
+	}
+
+	return true, ErrUnknownOperation
+}
 
 func (o *DoneOperation) run(id string, step ScenarioStep) (func(status *ScenarioStatus), error) {
 	return func(status *ScenarioStatus) {
 		status.Phase = ScenarioSucceeded
 		status.ScenarioResult.Timeline[step] = append(status.ScenarioResult.Timeline[step], ScenarioTimelineEvent{
-			ID:             id,
-			Step:           step,
-			Create:         nil,
-			Patch:          nil,
-			Delete:         nil,
-			Done:           nil,
-			PodScheduled:   nil,
-			PodUnscheduled: nil,
-			PodPreempted:   nil,
+			ID:   id,
+			Step: step,
 		})
 	}, nil
 }

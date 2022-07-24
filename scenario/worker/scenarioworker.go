@@ -1,6 +1,10 @@
 package worker
 
-import simulationv1alpha1 "sigs.k8s.io/kube-scheduler-simulator/scenario/api/v1alpha1"
+import (
+	"context"
+
+	simulationv1alpha1 "sigs.k8s.io/kube-scheduler-simulator/scenario/api/v1alpha1"
+)
 
 type ScenarioWorker struct {
 	scenario *simulationv1alpha1.Scenario
@@ -22,8 +26,18 @@ func New(scenario *simulationv1alpha1.Scenario) *ScenarioWorker {
 }
 
 func (w *ScenarioWorker) Run(stopCh chan<- struct{}) {
+	// TODO(sanposhiho): configure timeout from somewhere.
+	ctx := context.Background()
 	for _, s := range w.steppers {
-		s.run()
+		finish, err := s.run(ctx)
+		if err != nil {
+			// TODO: change Scenario state to fail.
+			return
+		}
+		if finish {
+			// TODO: change Scenario state to success.
+			return
+		}
 	}
 }
 

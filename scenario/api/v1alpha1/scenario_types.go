@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -45,24 +46,19 @@ type ScenarioOperation struct {
 	// If more than one is specified or if all are empty, the operation is invalid and the scenario will fail.
 
 	// Create is the operation to create new resource.
-	// When use CreateOperation, Operation should be "Create".
 	//
 	// +optional
 	Create *CreateOperation `json:"createOperation,omitempty"`
 	// Patch is the operation to patch a resource.
-	// When use PatchOperation, Operation should be "Patch".
 	//
 	// +optional
 	Patch *PatchOperation `json:"patchOperation,omitempty"`
 	// Delete indicates the operation to delete a resource.
-	// When use DeleteOperation, Operation should be "Delete".
 	//
 	// +optional
 	Delete *DeleteOperation `json:"deleteOperation,omitempty"`
-	// Done indicates the operation to mark the scenario as DONE.
-	// When use DoneOperation, Operation should be "Done".
-	// And the step which has DoneOperation shouldn't have the other types of operations,
-	// since DoneOperation will finish the Scenario immediately.
+	// Done indicates the operation to mark the scenario as Succeeded.
+	// When finish the step DoneOperation belongs, this Scenario changes its status to Succeeded.
 	//
 	// +optional
 	Done *DoneOperation `json:"doneOperation,omitempty"`
@@ -95,9 +91,11 @@ type PatchOperation struct {
 	ObjectMeta metav1.ObjectMeta `json:"objectMeta"`
 	// Patch is the patch for target.
 	Patch string `json:"patch"`
+	// PatchType
+	PatchType types.PatchType
 
 	// +optional
-	PatchOptions *metav1.PatchOptions `json:"patchOptions,omitempty"`
+	PatchOptions metav1.PatchOptions `json:"patchOptions,omitempty"`
 }
 
 type DeleteOperation struct {
@@ -105,15 +103,39 @@ type DeleteOperation struct {
 	ObjectMeta metav1.ObjectMeta `json:"objectMeta"`
 
 	// +optional
-	DeleteOptions *metav1.DeleteOptions `json:"deleteOptions,omitempty"`
+	DeleteOptions metav1.DeleteOptions `json:"deleteOptions,omitempty"`
 }
 
 type DoneOperation struct{}
 
-// ScenarioStep is the step simply represented by numbers and used in the simulation.
-// In ScenarioStep, step is moved to next step when it can no longer schedule any more Pods in that step.
-// See [TODO: document here] for more information about ScenarioStep.
+// ScenarioStep is the step simply represented by numbers and defined by Scenario.spec.operations.
+// ScenarioStep is moved to next step when it can no longer schedule any more Pods in that ScenarioStep.
+// See also the description on ScenarioSubStep below.
 type ScenarioStep int32
+
+// ScenarioSubStep represents time smaller than ScenarioStep.
+//
+// Within one ScenarioStep, operations other than Scenario.spec.operations may happen like Pod Scheduling, Pod Preemption ...etc.
+// And more, if you use Scenario against your original scheduler, any resource operations may happen during scheduling.
+//
+// It's only used in Scenario.status.scenarioResult.Timeline because ScenarioSubStep is only managed by the scenario controller,
+// whereas ScenarioStep is defined in Scenario.spec.operations.
+//
+// Yeah, you may still confuse about the concept ScenarioStep and ScenarioSubStep.
+//
+// Let's say you define operation to create replicaset that creates 4 Pod in Scenario.spec.operations.
+// 0. ScenarioStep is X and ScenarioSubStep is 0.
+// 1. In Operating StepPhase, 4 Pods (Pod1, Pod2, Pod3 and Pod4) are created.
+// 2. the scheduler starts scheduling.
+// 3. the scheduler tries to schedule Pod1 and the Pod1 is scheduled to Node1.
+// 4. Since Pod1 got scheduled, the Pod1.spec.NodeName will be updated.
+//    And that increments the ScenarioSubStep.
+// 5. the scheduler tries to schedule Pod2 next. And the Pod1 is preempted.
+// 6. Since Pod1 is preempted, the Pod1
+//
+//
+// ScenarioSubStep is moved to next step when an operation is going to be done against any resource.
+type ScenarioSubStep int32
 
 // ScenarioStatus defines the observed state of Scenario
 type ScenarioStatus struct {

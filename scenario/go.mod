@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.18.1
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	k8s.io/api v0.24.0
 	k8s.io/apimachinery v0.24.0
