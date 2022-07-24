@@ -38,6 +38,8 @@ func (w *ScenarioWorker) Run(stopCh chan<- struct{}) {
 			// TODO: change Scenario state to success.
 			return
 		}
+
+		// increment step
 	}
 }
 

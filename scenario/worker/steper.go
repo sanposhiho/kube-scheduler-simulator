@@ -2,7 +2,6 @@ package worker
 
 import (
 	"context"
-	"sort"
 
 	"golang.org/x/xerrors"
 	"sigs.k8s.io/kube-scheduler-simulator/scenario/utils"
@@ -19,35 +18,6 @@ type stepper struct {
 	events []*simulationv1alpha1.ScenarioOperation
 }
 
-// buildSteppersMap returns two data about steps;
-// - one is steppers map keyed by step.
-// - another is the list sorted by ascending order of step.
-func buildSteppersMap(scenario *simulationv1alpha1.Scenario) (map[simulationv1alpha1.ScenarioStep]*stepper, []simulationv1alpha1.ScenarioStep) {
-	eventmap := make(map[simulationv1alpha1.ScenarioStep][]*simulationv1alpha1.ScenarioOperation)
-	for _, event := range scenario.Spec.Operations {
-		if _, ok := eventmap[event.Step]; !ok {
-			eventmap[event.Step] = []*simulationv1alpha1.ScenarioOperation{}
-		}
-		eventmap[event.Step] = append(eventmap[event.Step], event)
-	}
-
-	steppers := make(map[simulationv1alpha1.ScenarioStep]*stepper)
-	stepList := make([]simulationv1alpha1.ScenarioStep, 0, len(eventmap))
-	for step, events := range eventmap {
-		steppers[step] = &stepper{
-			step:   step,
-			events: events,
-		}
-		stepList = append(stepList, step)
-	}
-
-	sort.Slice(stepList, func(i, j int) bool {
-		return stepList[i] < stepList[j]
-	})
-
-	return steppers, stepList
-}
-
 // run runs all events registered in s.step.
 // It returns boolean shows whether the Scenario should finish in this step.
 func (s *stepper) run(ctx context.Context) (bool, error) {
@@ -56,7 +26,14 @@ func (s *stepper) run(ctx context.Context) (bool, error) {
 		return true, xerrors.Errorf("run .spec.operation: %w", err)
 	}
 
+	s.wait()
+
 	return finish, nil
+}
+
+func (s *stepper) wait() error {
+	// TODO: implement
+	return nil
 }
 
 func (s *stepper) operate(ctx context.Context) (bool, error) {
