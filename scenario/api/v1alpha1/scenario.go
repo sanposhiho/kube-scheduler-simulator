@@ -17,34 +17,34 @@ import (
 
 // Run runs the event.
 // It returns boolean shows whether the Scenario should finish in this step.
-func (e *ScenarioOperation) Run(ctx context.Context, cfg *rest.Config) (bool, error) {
+func (s *ScenarioOperation) Run(ctx context.Context, cfg *rest.Config) (bool, error) {
 	// TODO: validation webhook will reject when there are multiple non-nil operations in single Event.
 	switch {
-	case e.Create != nil:
-		ope := e.Create
+	case s.Create != nil:
+		ope := s.Create
 		gvk := ope.Object.GetObjectKind().GroupVersionKind()
 		client, err := buildClient(gvk, cfg)
 		_, err = client.Create(ctx, ope.Object, ope.CreateOptions)
 		if err != nil {
-			return true, xerrors.Errorf("run create operation: id: %s error: %w", e.ID, err)
+			return true, xerrors.Errorf("run create operation: id: %s error: %w", s.ID, err)
 		}
-	case e.Patch != nil:
-		ope := e.Patch
+	case s.Patch != nil:
+		ope := s.Patch
 		gvk := ope.TypeMeta.GroupVersionKind()
 		client, err := buildClient(gvk, cfg)
 		_, err = client.Patch(ctx, ope.ObjectMeta.Name, ope.PatchType, []byte(ope.Patch), ope.PatchOptions)
 		if err != nil {
-			return true, xerrors.Errorf("run create operation: id: %s error: %w", e.ID, err)
+			return true, xerrors.Errorf("run create operation: id: %s error: %w", s.ID, err)
 		}
-	case e.Delete != nil:
-		ope := e.Delete
+	case s.Delete != nil:
+		ope := s.Delete
 		gvk := ope.TypeMeta.GroupVersionKind()
 		client, err := buildClient(gvk, cfg)
 		err = client.Delete(ctx, ope.ObjectMeta.Name, ope.DeleteOptions)
 		if err != nil {
-			return true, xerrors.Errorf("run create operation: id: %s error: %w", e.ID, err)
+			return true, xerrors.Errorf("run create operation: id: %s error: %w", s.ID, err)
 		}
-	case e.Done != nil:
+	case s.Done != nil:
 		return true, nil
 	}
 

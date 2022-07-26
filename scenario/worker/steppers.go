@@ -1,8 +1,11 @@
 package worker
 
 import (
+	"errors"
 	"sort"
 	"sync"
+
+	"golang.org/x/xerrors"
 
 	"sigs.k8s.io/kube-scheduler-simulator/scenario/api/v1alpha1"
 )
@@ -44,18 +47,48 @@ func newSteppers(scenario *v1alpha1.Scenario) steppers {
 	}
 }
 
-func (s *steppers) add(newstepper stepper) {
+func (s *steppers) add(newstepper stepper) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.s = append(s.s, newstepper)
+	_, ok := s.steppermap[newstepper.step]
+	if ok {
+		return xerrors.New("stepper is already exist")
+	}
+	s.steppermap[newstepper.step] = &newstepper
+
+	s.steps = append(s.steps, newstepper.step)
+
+	sort.Slice(s.steps, func(i, j int) bool {
+		return s.steps[i] < s.steps[j]
+	})
 }
 
-func (s *steppers) next() stepper {
+var ErrNoStepper = errors.New("steppers doesn't have stepper")
+
+// next fetches stepper which step is after a given currentStep.
+func (s *steppers) next(currentStep v1alpha1.ScenarioStep) (*stepper, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	next := s.s[0]
-	s.s = s.s[1:]
+	if len(s.steps) == 0 {
+		return nil, ErrNoStepper
+	}
 
-	return next
+	var nextstep v1alpha1.ScenarioStep
+	for {
+		nextstep = s.steps[0]
+		s.steps = s.steps[1:]
+		if currentStep < nextstep {
+			break
+		}
+	}
+
+	stepper, ok := s.steppermap[nextstep]
+	if !ok {
+		return nil, xerrors.New("stepper is not found")
+	}
+
+	delete(s.steppermap, nextstep)
+
+	return stepper, nil
 }

@@ -50,7 +50,6 @@ func (r *ScenarioReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	_ = log.FromContext(ctx)
 
 	// TODO(user): your logic here
-
 	return ctrl.Result{}, nil
 }
 
