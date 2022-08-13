@@ -3,6 +3,7 @@ module sigs.k8s.io/kube-scheduler-simulator/scenario
 go 1.18
 
 require (
+	github.com/golang/mock v1.5.0
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.18.1
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
