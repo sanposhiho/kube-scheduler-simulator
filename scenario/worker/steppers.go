@@ -11,28 +11,28 @@ import (
 )
 
 type steppers struct {
-	// steps is the list sorted by ascending order of step.
-	steps []v1alpha1.ScenarioStep
+	// steps is the list sorted by ascending order of major step.
+	steps []int32
 	// steppermap is the map keyed by step.
-	steppermap map[v1alpha1.ScenarioStep]*stepper
+	steppermap map[int32]*stepper
 	mu         sync.Mutex
 }
 
 func newSteppers(scenario *v1alpha1.Scenario) steppers {
-	eventmap := make(map[v1alpha1.ScenarioStep][]*v1alpha1.ScenarioOperation)
-	for _, event := range scenario.Spec.Operations {
-		if _, ok := eventmap[event.Step]; !ok {
-			eventmap[event.Step] = []*v1alpha1.ScenarioOperation{}
+	operationmap := make(map[int32][]*v1alpha1.ScenarioOperation)
+	for _, o := range scenario.Spec.Operations {
+		if _, ok := operationmap[o.MajorStep]; !ok {
+			operationmap[o.MajorStep] = []*v1alpha1.ScenarioOperation{}
 		}
-		eventmap[event.Step] = append(eventmap[event.Step], event)
+		operationmap[o.MajorStep] = append(operationmap[o.MajorStep], o)
 	}
 
-	steppermap := make(map[v1alpha1.ScenarioStep]*stepper)
-	stepList := make([]v1alpha1.ScenarioStep, 0, len(eventmap))
-	for step, events := range eventmap {
+	steppermap := make(map[int32]*stepper)
+	stepList := make([]int32, 0, len(operationmap))
+	for step, operations := range operationmap {
 		steppermap[step] = &stepper{
-			step:   step,
-			events: events,
+			step:       step,
+			operations: operations,
 		}
 		stepList = append(stepList, step)
 	}
@@ -65,8 +65,8 @@ func (s *steppers) add(newstepper stepper) error {
 
 var ErrNoStepper = errors.New("steppers doesn't have stepper")
 
-// next fetches stepper which step is after a given currentStep.
-func (s *steppers) next(currentStep v1alpha1.ScenarioStep) (*stepper, error) {
+// next fetches stepper which step is after a given currentStep.Major.
+func (s *steppers) next(currentMajorStep int32) (*stepper, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -74,11 +74,11 @@ func (s *steppers) next(currentStep v1alpha1.ScenarioStep) (*stepper, error) {
 		return nil, ErrNoStepper
 	}
 
-	var nextstep v1alpha1.ScenarioStep
+	var nextstep int32
 	for {
 		nextstep = s.steps[0]
 		s.steps = s.steps[1:]
-		if currentStep < nextstep {
+		if currentMajorStep < nextstep {
 			break
 		}
 	}

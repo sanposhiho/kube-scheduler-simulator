@@ -75,7 +75,7 @@ type ScenarioOperation struct {
 	// ID for this operation. Normally, the system sets this field for you.
 	ID string `json:"id"`
 	// MajorStep indicates when the operation should be done.
-	MajorStep int64 `json:"step"`
+	MajorStep int32 `json:"step"`
 
 	// One of the following four fields must be specified.
 	// If more than one is set or all are empty, the operation is invalid, and the scenario will fail.

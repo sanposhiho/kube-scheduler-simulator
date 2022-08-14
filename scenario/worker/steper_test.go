@@ -46,7 +46,7 @@ func Test_buildSteppersMap(t *testing.T) {
 			want: map[simulationv1alpha1.ScenarioStep]*stepper{
 				0: {
 					step: 0,
-					events: []*simulationv1alpha1.ScenarioOperation{
+					operations: []*simulationv1alpha1.ScenarioOperation{
 						{
 							ID:   "1",
 							Step: 0,
@@ -55,7 +55,7 @@ func Test_buildSteppersMap(t *testing.T) {
 				},
 				1: {
 					step: 1,
-					events: []*simulationv1alpha1.ScenarioOperation{
+					operations: []*simulationv1alpha1.ScenarioOperation{
 						{
 							ID:   "2",
 							Step: 1,
@@ -68,7 +68,7 @@ func Test_buildSteppersMap(t *testing.T) {
 				},
 				2: {
 					step: 2,
-					events: []*simulationv1alpha1.ScenarioOperation{
+					operations: []*simulationv1alpha1.ScenarioOperation{
 						{
 							ID:   "4",
 							Step: 2,

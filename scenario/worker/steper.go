@@ -11,14 +11,15 @@ import (
 	simulationv1alpha1 "sigs.k8s.io/kube-scheduler-simulator/scenario/api/v1alpha1"
 )
 
-// stepper will run all the events defined in the single step.
+// stepper will run all the operations defined in the single step.
 type stepper struct {
 	config *rest.Config
-	step   simulationv1alpha1.ScenarioStep
-	events []*simulationv1alpha1.ScenarioOperation
+	// step is major step
+	step       int32
+	operations []*simulationv1alpha1.ScenarioOperation
 }
 
-// run runs all events registered in s.step.
+// run runs all operations registered in s.step.
 // It returns boolean shows whether the Scenario should finish in this step.
 func (s *stepper) run(ctx context.Context) (bool, error) {
 	finish, err := s.operate(ctx)
@@ -41,15 +42,15 @@ func (s *stepper) operate(ctx context.Context) (bool, error) {
 
 	// whether the Scenario should finish in this step.
 	finishFlag := false
-	for _, event := range s.events {
+	for _, operation := range s.operations {
 		if err := eg.Sem.Acquire(ctx, 1); err != nil {
 			return false, xerrors.Errorf("acquire semaphore: %w", err)
 		}
-		event := event
+		operation := operation
 		eg.Grp.Go(func() error {
-			finish, err := event.Run(ctx, s.config)
+			finish, err := operation.Run(ctx, s.config)
 			if err != nil {
-				return xerrors.Errorf("run event: event id: %v, step %v, error: %w", event.ID, event.Step, err)
+				return xerrors.Errorf("run operation: operation id: %v, step %v, error: %w", operation.ID, operation.MajorStep, err)
 			}
 			if finish {
 				// update flag
