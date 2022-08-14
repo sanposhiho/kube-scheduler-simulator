@@ -10,21 +10,21 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-type ErrGroupWithSemaphore struct {
+type SemaphoredErrGroup struct {
 	g *errgroup.Group
 	s *semaphore.Weighted
 }
 
-func NewErrGroupWithSemaphore(ctx context.Context) *ErrGroupWithSemaphore {
+func NewErrGroupWithSemaphore(ctx context.Context) *SemaphoredErrGroup {
 	g, _ := errgroup.WithContext(ctx)
 	sem := semaphore.NewWeighted(int64(runtime.GOMAXPROCS(0)))
-	return &ErrGroupWithSemaphore{
+	return &SemaphoredErrGroup{
 		g: g,
 		s: sem,
 	}
 }
 
-func (e *ErrGroupWithSemaphore) Go(fn func() error) error {
+func (e *SemaphoredErrGroup) Go(fn func() error) error {
 	ctx := context.Background()
 	if err := e.s.Acquire(ctx, 1); err != nil {
 		return xerrors.Errorf("acquire semaphore: %w", err)
@@ -37,6 +37,6 @@ func (e *ErrGroupWithSemaphore) Go(fn func() error) error {
 	return nil
 }
 
-func (e *ErrGroupWithSemaphore) Wait() error {
+func (e *SemaphoredErrGroup) Wait() error {
 	return e.g.Wait()
 }
