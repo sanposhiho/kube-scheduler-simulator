@@ -69,9 +69,6 @@ type ScenarioEvent struct {
   ID string
   // Step indicates the step at which the event occurs.
   Step ScenarioStep
-  // Operation describes which operation this event wants to do.
-  // Only "Create", "Patch", "Delete", "Done" are valid operations in ScenarioEvent.
-  Operation OperationType
 
   // One of the following four fields must be specified.
   // If more than one is specified or if all are empty, the event is invalid and the scenario will fail.
@@ -90,20 +87,6 @@ type ScenarioEvent struct {
   DoneOperation   *DoneOperation
 }
 
-// OperationType describes Operation.
-// Please see the following defined OperationType, all operation types not listed below are invalid.
-type OperationType string 
-
-const (
-  CreateOperation         OperationType = "Create"
-  PatchOperation          OperationType = "Patch"
-  DeleteOperation         OperationType = "Delete"
-  DoneOperation           OperationType = "Done"
-  PodScheduledOperation   OperationType = "PodScheduled"
-  PodUnscheduledOperation OperationType = "PodUnscheduled"
-  PodPreemptedOperation   OperationType = "PodPreempted"
-)
-
 type CreateOperation struct {
   // Object is the Object to be create.
   Object runtime.Object
@@ -114,7 +97,7 @@ type CreateOperation struct {
 type PatchOperation struct {
   TypeMeta   metav1.TypeMeta
   ObjectMeta metav1.ObjectMeta
-​​  // Patch is the patch for target.
+  // Patch is the patch for target.
   Patch string
 
   Options metav1.PatchOptions
@@ -148,7 +131,7 @@ type ScenarioStatus struct {
   ScenarioResult ScenarioResult
 }
 
-​​type ScenarioPhase string
+type ScenarioPhase string
 
 const (
   // ScenarioPending phase indicates the scenario isn't started yet.
@@ -175,18 +158,14 @@ const (
 type ScenarioResult struct {
   // SimulatorVersion represents the version of the simulator that runs this scenario.
   SimulatorVersion string
-  // Timeline is a map of events keyed with ScenarioStep.
-  // This may have many of the same events as .spec.events, but has additional PodScheduled and Delete events for Pods 
-  // to represent a Pod is scheduled or preempted by the scheduler.
-  Timeline         map[ScenarioStep][]ScenarioTimelineEvent
+  // Timeline is a map of events.
+  // This may have many of the same events as .spec.events, but has additional Operations from controllers as well.
+  Timeline         []ScenarioTimelineEvent
 }
 
 type ScenarioTimelineEvent struct {
   // Step indicates the step at which the event occurs.
   Step      ScenarioStep
-  // Operation describes which operation this event wants to do.
-  // Only "Create", "Patch", "Delete", "Done", "PodScheduled", "PodUnscheduled", "PodPreempted" are valid operations in ScenarioTimelineEvent.
-  Operation OperationType
 
   // Only one of the following fields must be non-empty.
 
@@ -202,15 +181,6 @@ type ScenarioTimelineEvent struct {
   // Done is the result of ScenarioSpec.Events.DoneOperation.
   // When Done is non nil, Operation should be "Done".
   Done          *DoneOperationResult
-  // PodScheduled represents the Pod is scheduled to a Node.
-  // When PodScheduled is non nil, Operation should be "PodScheduled".
-  PodScheduled  *PodResult
-  // PodUnscheduled represents the scheduler tried to schedule the Pod, but cannot schedule to any Node.
-  // When PodUnscheduled is non nil, Operation should be "PodUnscheduled".
-  PodUnscheduled  *PodResult
-  // PodPreempted represents the scheduler preempted the Pod.
-  // When PodPreempted is non nil, Operation should be "PodPreempted".
-  PodPreempted  *PodResult
 }
 
 type CreateOperationResult struct {
@@ -228,64 +198,13 @@ type PatchOperationResult struct {
 type DeleteOperationResult struct {
   // Operation is the operation that was done.
   Operation DeleteOperation
+  // DeletedObject is the deleted resource.
+  DeletedObject runtime.Object
 }
 
 type DoneOperationResult struct {
   // Operation is the operation that was done.
   Operation DoneOperation
-}
-
-// PodResult has the results related to the specific Pod.
-// Depending on the status of the Pod, some fields may be empty.
-type PodResult struct {
-  Pod v1.Pod
-  // BoundTo indicates to which Node the Pod was scheduled.
-  BoundTo             *string
-  // PreemptedBy indicates which Pod the Pod was deleted for.
-  // This field may be nil if this Pod has not been preempted.
-  PreemptedBy         *string
-  // CreatedAt indicates when the Pod was created.
-  CreatedAt           ScenarioStep
-  // BoundAt indicates when the Pod was scheduled.
-  // This field may be nil if this Pod has not been scheduled.
-  BoundAt             *ScenarioStep
-  // PreemptedAt indicates when the Pod was preempted.
-  // This field may be nil if this Pod has not been preempted.
-  PreemptedAt         *ScenarioStep
-  // ScheduleResult has the results of all scheduling for the Pod.
-  ScheduleResult      []ScenarioPodScheduleResult
-}
-
-type ScenarioPodScheduleResult struct {
-  // Step indicates the step scheduling at which the scheduling is performed.
-  Step                *ScenarioStep
-  // AllCandidateNodes indicates all candidate Nodes before Filter.
-  AllCandidateNodes   []string
-  // AllFilteredNodes indicates all candidate Nodes after Filter.
-  AllFilteredNodes    []string
-  // PluginResults has each plugin’s result.
-  PluginResults       ScenarioPluginsResults
-}
-
-type (
-  NodeName   string
-  PluginName string
-)
-
-type ScenarioPluginsResults struct {
-  // Filter has each filter plugin’s result.
-  Filter            map[NodeName]map[PluginName]string
-  // Score has each score plugin’s score.
-  Score             map[NodeName]map[PluginName]ScenarioPluginsScoreResult
-}
-
-type ScenarioPluginsScoreResult struct {
-  // RawScore has the score from Score method of Score plugins.
-  RawScore             int64
-  // NormalizedScore has the score calculated by NormalizeScore method of Score plugins.
-  NormalizedScore      int64
-  // FinalScore has score plugin’s final score calculated by normalizing with NormalizedScore and applied Score plugin weight. 
-  FinalScore           int64
 }
 ```
 
@@ -350,14 +269,15 @@ We can add a new configuration environment variable `UPDATE_SCENARIO_RESULTS_STR
 
 #### The result calculation packages
 
-ScenarioResult only has the simple data that represent what was happen during the scenario.
+ScenarioResult only has the simple data that represent what happened during the scenario.
 
-So, we will provide useful functions and data structures to analize the result. 
+So, we will provide useful functions and data structures to analise the result. 
 
-For example:
+Here is the example ideas:
 - the function to aggregate changes in allocation rate of the entire cluster.
 - the function to aggregate changes in resource utilization for each Node.
-- the function to aggregate data by Pod.
+- the function to aggregate scheduling results from simulator's annotations.
+    - (the simulator records the scheduling results in Pod's annotation.)
 - the generic iterator function that users can aggregate custom values.
 - (Do you have any other idea? Tell us!)
 
