@@ -5,7 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/fields"
+	definederr "sigs.k8s.io/kube-scheduler-simulator/scenario/errors"
+	"sigs.k8s.io/kube-scheduler-simulator/scenario/utils"
 
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/memory"
@@ -17,8 +18,6 @@ import (
 
 var (
 	clientCache client.Client
-
-	ErrTooManyRunningScenario = errors.New("too many running scenario")
 )
 
 func CheckScenarioStepPhase(controllerName string, config *rest.Config) error {
@@ -28,25 +27,17 @@ func CheckScenarioStepPhase(controllerName string, config *rest.Config) error {
 		return err
 	}
 
-	list := v1alpha1.ScenarioList{}
-	if err := cli.List(ctx, &list, &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector("status.phase", string(v1alpha1.ScenarioRunning)),
-	}); err != nil {
+	running, err := utils.FetchRunningScenario(ctx, cli)
+	if err != nil {
+		if errors.Is(err, definederr.ErrNoRunningScenario) {
+			return nil
+		}
 		return err
 	}
 
-	if len(list.Items) > 1 {
-		return ErrTooManyRunningScenario
-	}
-	if len(list.Items) == 0 {
-		return nil
-	}
-
-	running := list.Items[0]
-
 	for {
 		// TODO: fix busy wait
-		if running.Status.StepStatus.Phase != v1alpha1.ControllerRunning && running.Status.StepStatus.RunningSimulatedController != controllerName {
+		if running.Status.StepStatus.Phase != v1alpha1.StepPhaseControllerRunning && running.Status.StepStatus.RunningSimulatedController != controllerName {
 			continue
 		}
 		break

@@ -53,7 +53,7 @@ func (s *ScenarioOperation) Run(ctx context.Context, cfg *rest.Config) (bool, er
 
 func (o *DoneOperation) run(id string, step ScenarioStep) (func(status *ScenarioStatus), error) {
 	return func(status *ScenarioStatus) {
-		status.Phase = ScenarioSucceeded
+		status.Phase = ScenarioPhaseSucceeded
 		status.ScenarioResult.Timeline[step] = append(status.ScenarioResult.Timeline[step], ScenarioTimelineEvent{
 			ID:   id,
 			Step: step,

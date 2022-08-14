@@ -39,31 +39,31 @@ func (w *ScenarioWorker) runOneStep(ctx context.Context, step int32) simulationv
 	if err != nil {
 		if errors.Is(err, ErrNoStepper) {
 			// no more step
-			return simulationv1alpha1.ScenarioPaused
+			return simulationv1alpha1.ScenarioPhasePaused
 		}
 
 		// TODO: set failed message
-		return simulationv1alpha1.ScenarioFailed
+		return simulationv1alpha1.ScenarioPhaseFailed
 	}
 
-	if err := w.changeStepPhase(ctx, simulationv1alpha1.Operating); err != nil {
+	if err := w.changeStepPhase(ctx, simulationv1alpha1.StepPhaseOperating); err != nil {
 		// TODO: set failed message
-		return simulationv1alpha1.ScenarioFailed
+		return simulationv1alpha1.ScenarioPhaseFailed
 	}
 
 	finish, err := stepper.run(ctx)
 	if err != nil {
 		// TODO: set failed message
-		return simulationv1alpha1.ScenarioFailed
+		return simulationv1alpha1.ScenarioPhaseFailed
 	}
 
-	if err := w.changeStepPhase(ctx, simulationv1alpha1.OperatingCompleted); err != nil {
+	if err := w.changeStepPhase(ctx, simulationv1alpha1.StepPhaseOperatingCompleted); err != nil {
 		// TODO: set failed message
-		return simulationv1alpha1.ScenarioFailed
+		return simulationv1alpha1.ScenarioPhaseFailed
 	}
 
 	if finish {
-		return simulationv1alpha1.ScenarioSucceeded
+		return simulationv1alpha1.ScenarioPhaseSucceeded
 	}
 }
 

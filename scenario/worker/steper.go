@@ -43,11 +43,8 @@ func (s *stepper) operate(ctx context.Context) (bool, error) {
 	// whether the Scenario should finish in this step.
 	finishFlag := false
 	for _, operation := range s.operations {
-		if err := eg.Sem.Acquire(ctx, 1); err != nil {
-			return false, xerrors.Errorf("acquire semaphore: %w", err)
-		}
 		operation := operation
-		eg.Grp.Go(func() error {
+		if err := eg.Go(func() error {
 			finish, err := operation.Run(ctx, s.config)
 			if err != nil {
 				return xerrors.Errorf("run operation: operation id: %v, step %v, error: %w", operation.ID, operation.MajorStep, err)
@@ -57,10 +54,12 @@ func (s *stepper) operate(ctx context.Context) (bool, error) {
 				finishFlag = finish
 			}
 			return nil
-		})
+		}); err != nil {
+			return false, xerrors.Errorf("start error group: operation id: %v, step %v, error: %w", operation.ID, operation.MajorStep, err)
+		}
 	}
 
-	if err := eg.Grp.Wait(); err != nil {
+	if err := eg.Wait(); err != nil {
 		return true, err
 	}
 

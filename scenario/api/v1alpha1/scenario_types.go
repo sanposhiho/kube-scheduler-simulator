@@ -48,7 +48,7 @@ type Controllers struct {
 	// So, you need to configure it only when you want to disable some controllers enabled by default.
 	//
 	// +optional
-	PreparingControllers *ControllerSet `json:"preparingControllers`
+	PreparingControllers *ControllerSet `json:"preparingControllers"`
 	// SimulatedControllers is a list of controllers that are the target of this simulation.
 	// These are run one by one in the same order specified in Enabled field.
 	//
@@ -68,7 +68,7 @@ type ControllerSet struct {
 }
 
 type Controller struct {
-	Name string
+	Name string `json:"name"`
 }
 
 type ScenarioOperation struct {
@@ -127,7 +127,7 @@ type PatchOperation struct {
 	// Patch is the patch for target.
 	Patch string `json:"patch"`
 	// PatchType
-	PatchType types.PatchType
+	PatchType types.PatchType `json:"patchType"`
 
 	// +optional
 	PatchOptions metav1.PatchOptions `json:"patchOptions,omitempty"`
@@ -188,60 +188,60 @@ type ScenarioStepStatus struct {
 type StepPhase string
 
 const (
-	// Operating means controller is currently operating operation defined for the step.
-	Operating StepPhase = "Operating"
-	// OperatingCompleted means the preparing controllers have finished operating operation defined for the step.
-	OperatingCompleted StepPhase = "OperatingCompleted"
-	// ControllerRunning means the simulated controller is working.
-	ControllerRunning StepPhase = "ControllerRunning"
-	// ControllerPaused means the simulated controller is paused(or will be paused).
-	ControllerPaused StepPhase = "ControllerPaused"
-	// ControllerCompleted means the current running simulated controller no longer do anything with the current cluster state.
-	ControllerCompleted StepPhase = "ControllerCompleted"
-	// StepCompleted means the controller is preparing to move to the next step.
-	StepCompleted StepPhase = "Finished"
+	// StepPhaseOperating means controller is currently operating operation defined for the step.
+	StepPhaseOperating StepPhase = "Operating"
+	// StepPhaseOperatingCompleted means the preparing controllers have finished operating operation defined for the step.
+	StepPhaseOperatingCompleted StepPhase = "OperatingCompleted"
+	// StepPhaseControllerRunning means the simulated controller is working.
+	StepPhaseControllerRunning StepPhase = "ControllerRunning"
+	// StepPhaseControllerPaused means the simulated controller is paused(or will be paused).
+	StepPhaseControllerPaused StepPhase = "ControllerPaused"
+	// StepPhaseControllerCompleted means the current running simulated controller no longer do anything with the current cluster state.
+	StepPhaseControllerCompleted StepPhase = "ControllerCompleted"
+	// StepPhaseCompleted means the controller is preparing to move to the next step.
+	StepPhaseCompleted StepPhase = "Finished"
 )
 
 type ScenarioPhase string
 
 const (
-	// ScenarioPending phase indicates the scenario isn't started yet.
+	// ScenarioPhasePending phase indicates the scenario isn't started yet.
 	// e.g., waiting for another scenario to finish running.
-	ScenarioPending ScenarioPhase = "Pending"
-	// ScenarioRunning phase indicates the scenario is running.
-	ScenarioRunning ScenarioPhase = "Running"
-	// ScenarioPaused phase indicates all ScenarioSpec.Operations
+	ScenarioPhasePending ScenarioPhase = "Pending"
+	// ScenarioPhaseRunning phase indicates the scenario is running.
+	ScenarioPhaseRunning ScenarioPhase = "Running"
+	// ScenarioPhasePaused phase indicates all ScenarioSpec.Operations
 	// has been finished but not marked as done by ScenarioDone ScenarioOperations.
-	ScenarioPaused ScenarioPhase = "Paused"
-	// ScenarioSucceeded phase describes Scenario is fully completed
+	ScenarioPhasePaused ScenarioPhase = "Paused"
+	// ScenarioPhaseSucceeded phase describes Scenario is fully completed
 	// by ScenarioDone ScenarioOperations. User
 	// can’t add any ScenarioOperations once
 	// Scenario reached this phase.
-	ScenarioSucceeded ScenarioPhase = "Succeeded"
-	// ScenarioFailed phase indicates something wrong happened while running the scenario.
+	ScenarioPhaseSucceeded ScenarioPhase = "Succeeded"
+	// ScenarioPhaseFailed phase indicates something wrong happened while running the scenario.
 	// For example:
 	// - the controller cannot create a resource for some reason.
 	// - users change the scheduler configuration via simulator API.
-	ScenarioFailed  ScenarioPhase = "Failed"
-	ScenarioUnknown ScenarioPhase = "Unknown"
+	ScenarioPhaseFailed  ScenarioPhase = "Failed"
+	ScenarioPhaseUnknown ScenarioPhase = "Unknown"
 )
 
 type ScenarioResult struct {
 	// SimulatorVersion represents the version of the simulator that runs this scenario.
 	SimulatorVersion string `json:"simulatorVersion"`
-	// Timeline is a map of operations keyed with ScenarioStep.
+	// Timeline is a map of operations keyed with ScenarioStep.Major(string).
 	// This may have many of the same operations as .spec.operations but has additional PodScheduled and Delete operations for Pods
 	// to represent a Pod is scheduled or preempted by the scheduler.
 	//
 	// +patchMergeKey=ID
 	// +patchStrategy=merge
-	Timeline map[ScenarioStep][]ScenarioTimelineEvent `json:"timeline"`
+	Timeline map[string][]ScenarioTimelineEvent `json:"timeline"`
 }
 
 type ScenarioTimelineEvent struct {
 	// The ID will be the same as spec.ScenarioOperations.ID if it is from the defined operation.
 	// Otherwise, it'll be newly generated.
-	ID string
+	ID string `json:"id"`
 	// Step indicates the ScenarioStep at which the operation has been done.
 	Step ScenarioStep `json:"step"`
 
