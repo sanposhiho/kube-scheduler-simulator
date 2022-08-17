@@ -2,8 +2,9 @@ package scheduler
 
 import (
 	"context"
-	"fmt"
 	"time"
+
+	"golang.org/x/xerrors"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -23,22 +24,20 @@ func New(client clientset.Interface) *schedulerWaiter {
 }
 
 func (s *schedulerWaiter) Name() string {
-
+	return "scheduler"
 }
 
-// これ以上何もできないかどうかだけを見る
 func (s *schedulerWaiter) WaitConditionFunc(ctx context.Context) (wait.ConditionFunc, error) {
 	unscheduledPods, err := s.client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector("spec.nodename", "").String(),
 	})
 	if err != nil {
-		return nil, err
+		return nil, xerrors.Errorf("fetch unscheduled Pods: %w", err)
 	}
 
 	lastCheckTime := time.Now()
 	waitFn := func() (bool, error) {
 		if len(unscheduledPods.Items) == 0 {
-			// これ以上何もできない。
 			return true, nil
 		}
 
@@ -65,7 +64,7 @@ func (s *schedulerWaiter) WaitConditionFunc(ctx context.Context) (wait.Condition
 
 			failedSchedulingEvents, err := s.client.CoreV1().Events(p.Namespace).List(context.Background(), eventOpt)
 			if err != nil {
-				return false, fmt.Errorf("list events: %w", err)
+				return false, xerrors.Errorf("list events: %w", err)
 			}
 
 			isUnscheduled := false
@@ -79,7 +78,6 @@ func (s *schedulerWaiter) WaitConditionFunc(ctx context.Context) (wait.Condition
 				return false, nil
 			}
 		}
-		// 全部がunscheduledだった
 		return true, nil
 	}
 	return waitFn, nil

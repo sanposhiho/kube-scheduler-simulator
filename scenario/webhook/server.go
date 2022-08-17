@@ -82,6 +82,7 @@ func (s *AdmissionWebhookServer) ValidationHandler(c echo.Context) error {
 	}
 
 	if running.Status.StepStatus.Phase == v1alpha1.StepPhaseControllerRunning {
+		// The running simulated controller will be stopped.
 		running.Status.StepStatus.Phase = v1alpha1.StepPhaseControllerPaused
 		running.Status.StepStatus.Step.Minor++
 	}
@@ -92,6 +93,7 @@ func (s *AdmissionWebhookServer) ValidationHandler(c echo.Context) error {
 		err := s.manager.Run(ctx)
 		if err != nil {
 			// TODO: log error
+			// TODO: change scenario status to fail?
 		}
 	}()
 
