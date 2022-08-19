@@ -19,6 +19,8 @@ package controllers
 import (
 	"context"
 
+	"sigs.k8s.io/kube-scheduler-simulator/scenario/worker"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -31,6 +33,7 @@ import (
 type ScenarioReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	w      *worker.ScenarioWorker
 }
 
 //+kubebuilder:rbac:groups=simulation.kube-scheduler-simulator.x-k8s.io,resources=scenarios,verbs=get;list;watch;create;update;patch;delete
@@ -48,9 +51,23 @@ type ScenarioReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.1/pkg/reconcile
 func (r *ScenarioReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
-	// ignore status change
+	// TODO: ignore non running scenario
 
-	// TODO(user): your logic here
+	scenario := &simulationv1alpha1.Scenario{}
+	if err := r.Get(ctx, req.NamespacedName, scenario); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if !scenario.ObjectMeta.DeletionTimestamp.IsZero() {
+		// running Scenario is deleted. stop the worker.
+		r.w.HandleDelete()
+
+		// TODO: run next scenario
+		return ctrl.Result{}, nil
+	}
+
+	// TODO: ignore status change
+
 	return ctrl.Result{}, nil
 }
 

@@ -74,12 +74,12 @@ func (w *ScenarioWorker) handleUpdate(new *simulationv1alpha1.Scenario) error {
 	return nil
 }
 
-func (w *ScenarioWorker) Stop() {
+func (w *ScenarioWorker) stop() {
 	w.stopCh <- struct{}{}
 }
 
-func (w *ScenarioWorker) handleDelete() {
-	w.Stop()
+func (w *ScenarioWorker) HandleDelete() {
+	w.stop()
 }
 
 func (w *ScenarioWorker) changeStepPhase(ctx context.Context, phase simulationv1alpha1.StepPhase) error {
