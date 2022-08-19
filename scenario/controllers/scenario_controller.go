@@ -48,6 +48,7 @@ type ScenarioReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.1/pkg/reconcile
 func (r *ScenarioReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
+	// ignore status change
 
 	// TODO(user): your logic here
 	return ctrl.Result{}, nil

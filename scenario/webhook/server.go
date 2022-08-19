@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	"sigs.k8s.io/kube-scheduler-simulator/scenario/manager"
 
 	definederr "sigs.k8s.io/kube-scheduler-simulator/scenario/errors"
@@ -81,24 +83,47 @@ func (s *AdmissionWebhookServer) ValidationHandler(c echo.Context) error {
 		return nil
 	}
 
+	controllers := sets.NewString()
+	for _, enabled := range running.Spec.Controllers.PreparingControllers.Enabled {
+		controllers.Insert(enabled.Name)
+	}
+	go func() {
+		// TODO: set timeout
+		ctx := context.Background()
+
+		done, err := s.manager.Run(ctx, controllers)
+		if err != nil {
+			// TODO: log error
+			// TODO: change scenario status to fail?
+			return
+		}
+		if !done {
+			return
+		}
+
+		running, err := utils.FetchRunningScenario(ctx, s.client)
+		if err != nil {
+			// TODO: log error
+			// TODO: change scenario status to fail?
+			return
+		}
+
+		running.Status.StepStatus.Phase = v1alpha1.StepPhaseOperatingCompleted
+
+		if err := s.client.Update(ctx, running, nil); err != nil {
+			// TODO: log error
+			// TODO: change scenario status to fail?
+			return
+		}
+	}()
+
 	if running.Status.StepStatus.Phase == v1alpha1.StepPhaseControllerRunning {
 		// The running simulated controller will be stopped.
 		running.Status.StepStatus.Phase = v1alpha1.StepPhaseControllerPaused
 		running.Status.StepStatus.Step.Minor++
-	}
-
-	go func() {
-		// TODO: set timeout
-		ctx := context.Background()
-		err := s.manager.Run(ctx)
-		if err != nil {
-			// TODO: log error
-			// TODO: change scenario status to fail?
+		if err := s.client.Update(ctx, running, nil); err != nil {
+			return err
 		}
-	}()
-
-	if err := s.client.Update(ctx, running, nil); err != nil {
-		return err
 	}
 
 	return nil

@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"context"
 	"errors"
+	"strconv"
 
 	runtimeschema "k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -54,14 +55,14 @@ func (s *ScenarioOperation) Run(ctx context.Context, cfg *rest.Config) (bool, er
 func (o *DoneOperation) run(id string, step ScenarioStep) (func(status *ScenarioStatus), error) {
 	return func(status *ScenarioStatus) {
 		status.Phase = ScenarioPhaseSucceeded
-		status.ScenarioResult.Timeline[step] = append(status.ScenarioResult.Timeline[step], ScenarioTimelineEvent{
+		status.ScenarioResult.Timeline[strconv.Itoa(int(step.Major))] = append(status.ScenarioResult.Timeline[strconv.Itoa(int(step.Major))], ScenarioTimelineEvent{
 			ID:   id,
 			Step: step,
 		})
 	}, nil
 }
 
-var ErrUnknownOperation = errors.New("")
+var ErrUnknownOperation = errors.New("unknown operation")
 
 func buildClient(gvk runtimeschema.GroupVersionKind, cfg *rest.Config) (dynamic.NamespaceableResourceInterface, error) {
 	cli, err := dynamic.NewForConfig(cfg)

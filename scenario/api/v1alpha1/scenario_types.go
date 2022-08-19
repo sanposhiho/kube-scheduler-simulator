@@ -44,8 +44,7 @@ type Controllers struct {
 	// They will run in parallel.
 	//
 	// It's an optional field.
-	// All controllers registered in the simulator will be enabled automatically. (except controllers set in Simulate.)
-	// So, you need to configure it only when you want to disable some controllers enabled by default.
+	// If nil, all controllers registered in the simulator will be enabled. (except controllers set in SimulatedController.)
 	//
 	// +optional
 	PreparingControllers *ControllerSet `json:"preparingControllers"`

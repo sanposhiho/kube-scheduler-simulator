@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	"golang.org/x/xerrors"
 
 	"sigs.k8s.io/kube-scheduler-simulator/scenario/utils"
@@ -33,35 +35,35 @@ func New(waiters []ControllerWaiter) *Manager {
 
 var interval = 5 * time.Second
 
-func (m *Manager) Run(ctx context.Context) error {
+func (m *Manager) Run(ctx context.Context, controllers sets.String) (bool, error) {
 	m.Lock()
 	// stop previous wait goroutines.
 	m.stopCh <- struct{}{}
 	m.stopCh = make(chan struct{})
 	m.Unlock()
 
-	if err := m.wait(ctx); err != nil {
-		return xerrors.Errorf("wait waiters: %w", err)
+	if err := m.wait(ctx, controllers); err != nil {
+		if errors.Is(err, wait.ErrWaitTimeout) {
+			// wait.ErrWaitTimeout is returned when stopCh is called.
+			return false, nil
+		}
+		return false, xerrors.Errorf("wait waiters: %w", err)
 	}
-	return nil
+	return true, nil
 }
 
-func (m *Manager) wait(ctx context.Context) error {
+func (m *Manager) wait(ctx context.Context, controllers sets.String) error {
 	eg := utils.NewErrGroupWithSemaphore(ctx)
 	for _, waiter := range m.waiters {
+		if !controllers.Has(waiter.Name()) {
+			continue
+		}
 		waitFn, err := waiter.WaitConditionFunc(ctx)
 		if err != nil {
 			return xerrors.Errorf("wait for waiter %s: %w", waiter.Name(), err)
 		}
 
-		if err := eg.Go(func() error {
-			// wait.ErrWaitTimeout is returned when stopCh is called.
-			if err := wait.PollUntil(interval, waitFn, m.stopCh); err != nil && !errors.Is(err, wait.ErrWaitTimeout) {
-				return err
-			}
-
-			return nil
-		}); err != nil {
+		if err := eg.Go(func() error { return wait.PollUntil(interval, waitFn, m.stopCh) }); err != nil {
 			return xerrors.Errorf("start an error group: %w", err)
 		}
 	}
