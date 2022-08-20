@@ -61,10 +61,11 @@ func (r *ScenarioReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if !scenario.ObjectMeta.DeletionTimestamp.IsZero() {
 		// running Scenario is deleted. stop the worker.
 		r.w.HandleDelete()
-
 		// TODO: run next scenario
 		return ctrl.Result{}, nil
 	}
+
+	r.w.HandleUpdate(scenario)
 
 	// TODO: ignore status change
 

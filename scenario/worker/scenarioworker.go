@@ -4,16 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+
+	"github.com/google/go-cmp/cmp"
+
+	"sigs.k8s.io/kube-scheduler-simulator/scenario/manager"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	simulationv1alpha1 "sigs.k8s.io/kube-scheduler-simulator/scenario/api/v1alpha1"
 )
 
 type ScenarioWorker struct {
+	sync.RWMutex
 	scenario *simulationv1alpha1.Scenario
 	steppers steppers
 	stopCh   chan<- struct{}
 	client   client.Client
+
+	manager manager.Manager
 }
 
 func New(scenario *simulationv1alpha1.Scenario) *ScenarioWorker {
@@ -30,45 +38,60 @@ func (w *ScenarioWorker) Run(stopCh chan<- struct{}) {
 	ctx := context.Background()
 	currentStep := w.scenario.Status.StepStatus.Step.Major
 	for {
-		w.runOneStep(ctx, currentStep)
+		finish, err := w.runOneStep(ctx, currentStep)
+		if err != nil {
+			// TODO: log
+			// set failed message
+		}
+		if finish {
+			break
+		}
 	}
 }
 
-func (w *ScenarioWorker) runOneStep(ctx context.Context, step int32) simulationv1alpha1.ScenarioPhase {
+func (w *ScenarioWorker) runOneStep(ctx context.Context, step int32) (bool, error) {
 	stepper, err := w.steppers.next(step)
 	if err != nil {
 		if errors.Is(err, ErrNoStepper) {
 			// no more step
-			return simulationv1alpha1.ScenarioPhasePaused
+			// simulationv1alpha1.ScenarioPhasePaused
+			return false, nil
 		}
 
-		// TODO: set failed message
-		return simulationv1alpha1.ScenarioPhaseFailed
+		// simulationv1alpha1.ScenarioPhaseFailed
+		return true, err
 	}
 
 	if err := w.changeStepPhase(ctx, simulationv1alpha1.StepPhaseOperating); err != nil {
-		// TODO: set failed message
-		return simulationv1alpha1.ScenarioPhaseFailed
+		// simulationv1alpha1.ScenarioPhaseFailed
+		return true, err
 	}
 
 	finish, err := stepper.run(ctx)
 	if err != nil {
-		// TODO: set failed message
-		return simulationv1alpha1.ScenarioPhaseFailed
+		// simulationv1alpha1.ScenarioPhaseFailed
+		return true, err
 	}
 
 	if err := w.changeStepPhase(ctx, simulationv1alpha1.StepPhaseOperatingCompleted); err != nil {
-		// TODO: set failed message
-		return simulationv1alpha1.ScenarioPhaseFailed
+		// simulationv1alpha1.ScenarioPhaseFailed
+		return true, err
 	}
 
 	if finish {
-		return simulationv1alpha1.ScenarioPhaseSucceeded
+		// simulationv1alpha1.ScenarioPhaseSucceeded
+		return true, err
 	}
+
+	return false, nil
 }
 
-func (w *ScenarioWorker) handleUpdate(new *simulationv1alpha1.Scenario) error {
-	// TODO: we need to validate the change.
+func (w *ScenarioWorker) HandleUpdate(new *simulationv1alpha1.Scenario) error {
+	if !w.areOperationsChanged(new) {
+		return nil
+	}
+	w.Lock()
+	defer w.Unlock()
 	w.scenario = new
 	w.steppers = newSteppers(new)
 	return nil
@@ -88,4 +111,8 @@ func (w *ScenarioWorker) changeStepPhase(ctx context.Context, phase simulationv1
 		return fmt.Errorf("update step phase: %w", err)
 	}
 	return nil
+}
+
+func (w *ScenarioWorker) areOperationsChanged(new *simulationv1alpha1.Scenario) bool {
+	return cmp.Equal(new.Spec.Operations, w.scenario.Spec.Operations)
 }
