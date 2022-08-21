@@ -20,6 +20,9 @@ import (
 	"flag"
 	"os"
 
+	"sigs.k8s.io/kube-scheduler-simulator/scenario/waitermanager"
+	"sigs.k8s.io/kube-scheduler-simulator/scenario/waiters/scheduler"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -89,9 +92,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	m := waitermanager.New(scheduler.New(mgr.GetClient()))
+
 	if err = (&controllers.ScenarioReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:                mgr.GetClient(),
+		Scheme:                mgr.GetScheme(),
+		ControllerWaitManager: m,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Scenario")
 		os.Exit(1)

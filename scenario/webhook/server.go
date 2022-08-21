@@ -9,7 +9,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"sigs.k8s.io/kube-scheduler-simulator/scenario/manager"
+	"sigs.k8s.io/kube-scheduler-simulator/scenario/waitermanager"
 
 	definederr "sigs.k8s.io/kube-scheduler-simulator/scenario/errors"
 
@@ -28,7 +28,7 @@ import (
 type AdmissionWebhookServer struct {
 	e       *echo.Echo
 	client  client.Client
-	manager manager.Manager
+	manager waitermanager.Manager
 }
 
 // NewSimulatorServer initialize AdmissionWebhookServer.

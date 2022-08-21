@@ -42,7 +42,6 @@ var _ webhook.Defaulter = &Scenario{}
 func (r *Scenario) Default() {
 	scenariolog.Info("default", "name", r.Name)
 
-	// TODO(user): fill in your defaulting logic.
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
@@ -63,6 +62,7 @@ func (r *Scenario) ValidateUpdate(old runtime.Object) error {
 	scenariolog.Info("validate update", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object update.
+	// TODO: not update .spec.controller of running scenario
 	return nil
 }
 

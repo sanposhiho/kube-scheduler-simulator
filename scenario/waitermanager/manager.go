@@ -1,4 +1,4 @@
-package manager
+package waitermanager
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 type Manager struct {
 	waiters []ControllerWaiter
 	stopCh  chan struct{}
-	sync.Mutex
+	mu      sync.Mutex
 }
 
 type ControllerWaiter interface {
@@ -26,7 +26,7 @@ type ControllerWaiter interface {
 	WaitConditionFunc(ctx context.Context) (wait.ConditionFunc, error)
 }
 
-func New(waiters []ControllerWaiter) *Manager {
+func New(waiters ...ControllerWaiter) *Manager {
 	return &Manager{
 		waiters: waiters,
 		stopCh:  make(chan struct{}),
@@ -36,11 +36,11 @@ func New(waiters []ControllerWaiter) *Manager {
 var interval = 5 * time.Second
 
 func (m *Manager) Run(ctx context.Context, controllers sets.String) (bool, error) {
-	m.Lock()
+	m.mu.Lock()
 	// stop previous wait goroutines.
 	m.stopCh <- struct{}{}
 	m.stopCh = make(chan struct{})
-	m.Unlock()
+	m.mu.Unlock()
 
 	if err := m.wait(ctx, controllers); err != nil {
 		if errors.Is(err, wait.ErrWaitTimeout) {

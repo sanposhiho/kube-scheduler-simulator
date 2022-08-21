@@ -4,22 +4,21 @@ import (
 	"context"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"golang.org/x/xerrors"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/apimachinery/pkg/fields"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	clientset "k8s.io/client-go/kubernetes"
 )
 
 type schedulerWaiter struct {
-	client clientset.Interface
+	client client.Client
 }
 
-func New(client clientset.Interface) *schedulerWaiter {
+func New(client client.Client) *schedulerWaiter {
 	return &schedulerWaiter{client: client}
 }
 
@@ -28,9 +27,7 @@ func (s *schedulerWaiter) Name() string {
 }
 
 func (s *schedulerWaiter) WaitConditionFunc(ctx context.Context) (wait.ConditionFunc, error) {
-	unscheduledPods, err := s.client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector("spec.nodename", "").String(),
-	})
+	unscheduledPods, err := s.listUnscheduledPods(ctx)
 	if err != nil {
 		return nil, xerrors.Errorf("fetch unscheduled Pods: %w", err)
 	}
@@ -41,9 +38,7 @@ func (s *schedulerWaiter) WaitConditionFunc(ctx context.Context) (wait.Condition
 			return true, nil
 		}
 
-		currentUnscheduledPods, err := s.client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
-			FieldSelector: fields.OneTermEqualSelector("spec.nodename", "").String(),
-		})
+		currentUnscheduledPods, err := s.listUnscheduledPods(ctx)
 		if err != nil {
 			return false, err
 		}
@@ -54,15 +49,16 @@ func (s *schedulerWaiter) WaitConditionFunc(ctx context.Context) (wait.Condition
 		}
 
 		for _, p := range unscheduledPods.Items {
-			eventOpt := metav1.ListOptions{
+			eventOpt := &client.ListOptions{
 				FieldSelector: fields.AndSelectors(
 					fields.OneTermEqualSelector("reason", "FailedScheduling"),
 					fields.OneTermEqualSelector("involvedObject.name", p.Name),
 					fields.OneTermEqualSelector("involvedObject.kind", p.Kind),
-				).String(),
+				),
 			}
 
-			failedSchedulingEvents, err := s.client.CoreV1().Events(p.Namespace).List(context.Background(), eventOpt)
+			failedSchedulingEvents := &v1.EventList{}
+			err := s.client.List(ctx, failedSchedulingEvents, eventOpt)
 			if err != nil {
 				return false, xerrors.Errorf("list events: %w", err)
 			}
@@ -81,4 +77,16 @@ func (s *schedulerWaiter) WaitConditionFunc(ctx context.Context) (wait.Condition
 		return true, nil
 	}
 	return waitFn, nil
+}
+
+func (s *schedulerWaiter) listUnscheduledPods(ctx context.Context) (*v1.PodList, error) {
+	pods := &v1.PodList{}
+	err := s.client.List(ctx, pods, &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector("spec.nodename", ""),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return pods, nil
 }

@@ -19,6 +19,8 @@ package controllers
 import (
 	"context"
 
+	"sigs.k8s.io/kube-scheduler-simulator/scenario/waitermanager"
+
 	"sigs.k8s.io/kube-scheduler-simulator/scenario/worker"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,8 +34,9 @@ import (
 // ScenarioReconciler reconciles a Scenario object
 type ScenarioReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
-	w      *worker.ScenarioWorker
+	Scheme                *runtime.Scheme
+	w                     *worker.ScenarioWorker
+	ControllerWaitManager *waitermanager.Manager
 }
 
 //+kubebuilder:rbac:groups=simulation.kube-scheduler-simulator.x-k8s.io,resources=scenarios,verbs=get;list;watch;create;update;patch;delete
@@ -61,13 +64,20 @@ func (r *ScenarioReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if !scenario.ObjectMeta.DeletionTimestamp.IsZero() {
 		// running Scenario is deleted. stop the worker.
 		r.w.HandleDelete()
-		// TODO: run next scenario
+		r.w = nil
+	}
+
+	if r.w == nil || scenario.Status.Phase == simulationv1alpha1.ScenarioPhaseSucceeded || scenario.Status.Phase == simulationv1alpha1.ScenarioPhaseFailed {
+		// TODO next scenario
+		r.w = worker.New(scenario, r.Client, r.ControllerWaitManager)
 		return ctrl.Result{}, nil
 	}
 
-	r.w.HandleUpdate(scenario)
-
-	// TODO: ignore status change
+	if scenario.Name == r.w.ScenarioName {
+		if err := r.w.HandleUpdate(scenario); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
 
 	return ctrl.Result{}, nil
 }
