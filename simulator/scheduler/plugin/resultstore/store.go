@@ -64,8 +64,15 @@ func New(informerFactory informers.SharedInformerFactory, client clientset.Inter
 	// Store adds scheduling results when pod is updating.
 	// This is because scheduling framework doesn’t have any phase to hook scheduling finished. (both successfully and non-successfully)
 	informerFactory.Core().V1().Pods().Informer().AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			UpdateFunc: s.addSchedulingResultToPod,
+		cache.FilteringResourceEventHandler{
+			// filter out non-scheduled Pod.
+			FilterFunc: func(obj interface{}) bool {
+				pod := obj.(*v1.Pod)
+				return len(pod.Spec.NodeName) != 0
+			},
+			Handler: cache.ResourceEventHandlerFuncs{
+				UpdateFunc: s.addSchedulingResultToPod,
+			},
 		},
 	)
 
