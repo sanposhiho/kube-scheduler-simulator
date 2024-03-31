@@ -1,6 +1,7 @@
 FROM node:16-alpine AS deps
 
-RUN apk update && \
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g'  /etc/apk/repositories&&  \
+    apk update && \
     apk upgrade && \
     apk add --no-cache make gcc g++ py-pip
 

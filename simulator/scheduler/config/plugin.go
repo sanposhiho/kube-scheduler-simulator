@@ -7,9 +7,16 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 )
 
-var outOfTreeRegistries = runtime.Registry{
+var (
+	outOfTreeRegistries = runtime.Registry{
 	// TODO(user): add your plugins registries here.
-}
+		nodenumber.Name: nodenumber.New,
+	}
+
+	registeredOutOfTreeMultiPointName = []string{
+        	nodenumber.Name,
+    	}
+)
 
 // RegisteredMultiPointPluginNames returns all registered multipoint plugin names.
 // in-tree plugins and your original plugins listed in outOfTreeRegistries above.

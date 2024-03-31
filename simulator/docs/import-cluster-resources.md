@@ -11,6 +11,4 @@ externalSchedulerEnabled: false
 kubeConfig: "/path/to/your-cluster-kubeconfig"
 ```
 
-Then, the simulator imports resources from your cluster once when it's initialized.
-
-See also [simulator/docs/simulator-server-config.md](simulator-server-config.md).
+See also [simulator/docs/simulator-server-config.md](simulator/docs/simulator-server-config.md).

@@ -25,7 +25,8 @@ services:
     - "3000:3000"
     tty: true
   simulator-cluster:
-    image: registry.k8s.io/kwok/cluster:v0.5.1-k8s.v1.29.0
+    #    image: registry.k8s.io/kwok/cluster:v0.5.1-k8s.v1.29.0
+    image: k8s.nju.edu.cn/kwok/cluster:v0.5.1-k8s.v1.29.0
     container_name: simulator-cluster
     restart: always
     ports:

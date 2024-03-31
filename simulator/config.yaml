@@ -32,7 +32,8 @@ kubeApiServerUrl: ""
 # If passed, the simulator will start the scheduler
 # with that configuration. Or, if you use web UI,
 # you can change the configuration from the web UI as well.
-kubeSchedulerConfigPath: ""
+kubeSchedulerConfigPath: "/home/tom/test_laest/kube-scheduler-simulator/simulator/docs/sample/debuggable-scheduler
+/scheduler.yaml"
 
 # This variable indicates whether the simulator will
 # import resources from an user cluster's or not.
